@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <script src="/socket.io/socket.io.js"></script>
+    <title>Tap & Key Racer!</title>
+    <style>
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        margin: 0;
+        padding: 10px;
+        background-color: #000000; /* Black background */
+        color: #e0e0e0; /* Light text */
+        touch-action: manipulation; /* Allows tap, prevents double-tap zoom etc. */
+        overflow: hidden;
+        height: 100vh;
+        box-sizing: border-box;
+      }
+      #gameCanvas {
+        border: 3px solid #7b509d;
+        border-radius: 12px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        max-width: 95vw;
+        max-height: 80vh; /* Increased max height for better laptop view */
+        aspect-ratio: 800 / 600;
+        cursor: pointer; /* Indicate canvas is interactive */
+      }
+      h1 {
+        color: #9d70c7;
+        margin-bottom: 5px;
+        font-size: 1.8em; /* Slightly larger for desktop */
+      }
+      p {
+        color: #bdc3c7;
+        margin-top: 5px;
+        font-size: 1em; /* Slightly larger for desktop */
+      }
+      #playerIdDisplay {
+        margin-top: 15px; /* More space from canvas */
+        font-weight: bold;
+        font-size: 1em;
+      }
+      /* Removed Gemini button and commentary display styles */
+    </style>
+  </head>
+  <body>
+    <h1>Tap & Key Racer!</h1>
+    <p>Tap screen or press Space/Up Arrow to move forward!</p>
+    <canvas id="gameCanvas"></canvas>
+
+    <p id="playerIdDisplay">You are car #<span id="playerNumber">-</span></p>
+
+    <script>
+      const canvas = document.getElementById("gameCanvas");
+      const context = canvas.getContext("2d");
+      const playerIdDisplay = document.getElementById("playerIdDisplay");
+
+      const socket = io();
+
+      let players = {};
+      let myId = null;
+      let myName = "Player";
+
+      const playerSize = 20;
+      const playerMoveAngle = 0.05; // Radians to move per action
+
+      // Track properties
+      let trackCenterX, trackCenterY, trackRadius;
+      const trackWidth = 3; // Thin line
+      const trackColor = "#9370DB"; // Bright purple neon color
+      const backgroundColor = "#000000"; // Black background
+
+      function resizeCanvas() {
+        const aspectRatio = 800 / 600;
+        let newWidth = window.innerWidth * 0.95;
+        let newHeight = window.innerHeight * 0.8; // Adjusted for more vertical space
+
+        if (newWidth / newHeight > aspectRatio) {
+          newWidth = newHeight * aspectRatio;
+        } else {
+          newHeight = newWidth / aspectRatio;
+        }
+
+        canvas.width = newWidth;
+        canvas.height = newHeight;
+
+        trackCenterX = canvas.width / 2;
+        trackCenterY = canvas.height / 2;
+        // Use the smaller dimension to create a perfect circle that fits
+        trackRadius = Math.min(canvas.width, canvas.height) / 2.5;
+
+        if (myId && players[myId]) {
+          players[myId].x =
+            trackCenterX + trackRadius * Math.cos(players[myId].angle);
+          players[myId].y =
+            trackCenterY + trackRadius * Math.sin(players[myId].angle);
+        }
+        draw();
+      }
+
+      // --- Socket Event Handlers ---
+      socket.on("yourId", (id, name) => {
+        myId = id;
+        myName = name;
+        playerIdDisplay.textContent = `Your Name: ${myName}`;
+        if (players[myId]) {
+          players[myId].name = name;
+          players[myId].x =
+            trackCenterX + trackRadiusX * Math.cos(players[myId].angle);
+          players[myId].y =
+            trackCenterY + trackRadiusY * Math.sin(players[myId].angle);
+        }
+        console.log("My ID:", myId, "My Name:", myName);
+      });
+
+      socket.on("currentPlayers", (serverPlayers) => {
+        players = serverPlayers;
+        for (const id in players) {
+          players[id].x =
+            trackCenterX + trackRadius * Math.cos(players[id].angle);
+          players[id].y =
+            trackCenterY + trackRadius * Math.sin(players[id].angle);
+        }
+        console.log("Current players:", players);
+        if (myId && players[myId]) {
+          myName = players[myId].name;
+          document.getElementById("playerNumber").textContent =
+            Object.keys(players).indexOf(myId) + 1;
+        }
+        draw();
+      });
+
+      socket.on("newPlayer", (newPlayer) => {
+        newPlayer.x = trackCenterX + trackRadiusX * Math.cos(newPlayer.angle);
+        newPlayer.y = trackCenterY + trackRadiusY * Math.sin(newPlayer.angle);
+        players[newPlayer.id] = newPlayer;
+        console.log("New player joined:", newPlayer);
+        draw();
+      });
+
+      socket.on("playerMoved", (playerData) => {
+        if (players[playerData.id]) {
+          players[playerData.id].angle = playerData.angle;
+          players[playerData.id].x =
+            trackCenterX + trackRadiusX * Math.cos(playerData.angle);
+          players[playerData.id].y =
+            trackCenterY + trackRadiusY * Math.sin(playerData.angle);
+          players[playerData.id].color = playerData.color;
+          players[playerData.id].name = playerData.name;
+        } else {
+          playerData.x =
+            trackCenterX + trackRadiusX * Math.cos(playerData.angle);
+          playerData.y =
+            trackCenterY + trackRadiusY * Math.sin(playerData.angle);
+          players[playerData.id] = playerData;
+        }
+        draw();
+      });
+
+      socket.on("playerDisconnected", (playerId) => {
+        console.log("Player disconnected:", playerId);
+        // const disconnectedPlayerName = players[playerId] ? players[playerId].name : 'A player';
+        delete players[playerId];
+        // Removed Gemini commentary display
+        draw();
+      });
+
+      // Removed Gemini socket event handlers ('newCommentary', 'commentaryError')
+
+      // --- Drawing Functions ---
+      function drawTrack() {
+        // Create glowing effect for neon
+        context.shadowBlur = 15;
+        context.shadowColor = "#9370DB";
+        
+        context.strokeStyle = trackColor;
+        context.lineWidth = trackWidth;
+        context.beginPath();
+        context.arc(
+          trackCenterX,
+          trackCenterY,
+          trackRadius,
+          0,
+          2 * Math.PI
+        );
+        context.stroke();
+        
+        // Reset shadow for other elements
+        context.shadowBlur = 0;
+
+        // Draw start line
+        context.strokeStyle = "white";
+        context.lineWidth = 2;
+        context.beginPath();
+        const startLineAngle = 0;
+        const x1 = trackCenterX + (trackRadius - 5) * Math.cos(startLineAngle);
+        const y1 = trackCenterY + (trackRadius - 5) * Math.sin(startLineAngle);
+        const x2 = trackCenterX + (trackRadius + 5) * Math.cos(startLineAngle);
+        const y2 = trackCenterY + (trackRadius + 5) * Math.sin(startLineAngle);
+        context.moveTo(x1, y1);
+        context.lineTo(x2, y2);
+        context.stroke();
+      }
+
+      function drawPlayers() {
+        // Assign numbers to players based on their position in the players object
+        let playerNumber = 1;
+        const playerNumbers = {};
+        for (const id in players) {
+          playerNumbers[id] = playerNumber++;
+        }
+
+        for (const id in players) {
+          const player = players[id];
+          const number = playerNumbers[id];
+
+          // Draw player cube
+          context.fillStyle = player.color;
+          context.fillRect(
+            player.x - playerSize / 2,
+            player.y - playerSize / 2,
+            playerSize,
+            playerSize
+          );
+
+          // Draw number on cube
+          context.fillStyle = "white";
+          context.font = `bold ${playerSize * 0.6}px Arial`;
+          context.textAlign = "center";
+          context.textBaseline = "middle";
+          context.fillText(number.toString(), player.x, player.y);
+
+          // Highlight current player with a white border
+          if (id === myId) {
+            context.strokeStyle = "white";
+            context.lineWidth = 2;
+            context.strokeRect(
+              player.x - playerSize / 2 - 2,
+              player.y - playerSize / 2 - 2,
+              playerSize + 4,
+              playerSize + 4
+            );
+          }
+        }
+      }
+
+      function draw() {
+        context.fillStyle = backgroundColor;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        drawTrack();
+        drawPlayers();
+      }
+
+      // --- Input Handling ---
+      function movePlayerForward() {
+        if (!myId || !players[myId]) return;
+
+        players[myId].angle += playerMoveAngle;
+        if (players[myId].angle > 2 * Math.PI) {
+          players[myId].angle -= 2 * Math.PI;
+        }
+
+        players[myId].x =
+          trackCenterX + trackRadius * Math.cos(players[myId].angle);
+        players[myId].y =
+          trackCenterY + trackRadius * Math.sin(players[myId].angle);
+
+        socket.emit("playerMovement", {
+          x: players[myId].x,
+          y: players[myId].y,
+          angle: players[myId].angle,
+        });
+        draw();
+      }
+
+      // Tap control
+      canvas.addEventListener("click", movePlayerForward);
+      canvas.addEventListener(
+        "touchstart",
+        (e) => {
+          e.preventDefault();
+          movePlayerForward();
+        },
+        { passive: false }
+      );
+
+      // Keyboard control for laptop friendliness
+      window.addEventListener("keydown", (event) => {
+        if (
+          event.key === " " ||
+          event.key === "ArrowUp" ||
+          event.key.toLowerCase() === "w"
+        ) {
+          event.preventDefault(); // Prevent page scroll on space/arrow
+          movePlayerForward();
+        }
+      });
+
+      // Removed Gemini button event listener
+
+      // Initial setup
+      window.addEventListener("resize", resizeCanvas);
+      resizeCanvas();
+
+      setTimeout(() => {
+        if (Object.keys(players).length === 0) {
+          resizeCanvas();
+        }
+      }, 500);
+    </script>
+  </body>
+</html>
