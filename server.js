@@ -11,6 +11,7 @@ app.use(express.static("public"));
 const PORT = 3001;
 let players = {};
 let playerCount = 0; // Track the number of players for assigning player numbers
+const INACTIVITY_TIMEOUT = 20000; // 20 seconds in ms
 
 // Track parameters (server needs to know the starting line concept for initial position)
 const trackCenterX = 400; // Assuming client canvas width 800
@@ -26,6 +27,23 @@ function getRandomColor() {
   }
   return color;
 }
+
+// Periodically check for inactive players
+setInterval(() => {
+  const now = Date.now();
+  for (const id in players) {
+    if (
+      players[id].lastActive &&
+      now - players[id].lastActive > INACTIVITY_TIMEOUT
+    ) {
+      // Disconnect the socket if inactive
+      const socket = io.sockets.sockets.get(id);
+      if (socket) {
+        socket.disconnect(true);
+      }
+    }
+  }
+}, 2000); // Check every 2 seconds
 
 io.on("connection", (socket) => {
   console.log("A user connected:", socket.id);
@@ -44,6 +62,7 @@ io.on("connection", (socket) => {
     color: playerColor,
     id: socket.id,
     number: playerNumber, // Use number instead of name
+    lastActive: Date.now(), // Track last activity
   };
 
   socket.emit("currentPlayers", players);
@@ -55,6 +74,7 @@ io.on("connection", (socket) => {
       players[socket.id].x = movementData.x;
       players[socket.id].y = movementData.y;
       players[socket.id].angle = movementData.angle;
+      players[socket.id].lastActive = Date.now(); // Update last activity
       socket.broadcast.emit("playerMoved", players[socket.id]);
     }
   });

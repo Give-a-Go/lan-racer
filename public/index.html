@@ -167,10 +167,13 @@
 
       socket.on("playerDisconnected", (playerId) => {
         console.log("Player disconnected:", playerId);
-        // const disconnectedPlayerName = players[playerId] ? players[playerId].name : 'A player';
+        const wasMe = playerId === myId;
         delete players[playerId];
-        // Removed Gemini commentary display
         draw();
+        if (wasMe) {
+          playerIdDisplay.innerHTML =
+            '<span style="color: #ff4444">You have been disconnected due to inactivity.</span>';
+        }
       });
 
       // Removed Gemini socket event handlers ('newCommentary', 'commentaryError')
