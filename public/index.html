@@ -138,8 +138,8 @@
       });
 
       socket.on("newPlayer", (newPlayer) => {
-        newPlayer.x = trackCenterX + trackRadiusX * Math.cos(newPlayer.angle);
-        newPlayer.y = trackCenterY + trackRadiusY * Math.sin(newPlayer.angle);
+        newPlayer.x = trackCenterX + trackRadius * Math.cos(newPlayer.angle);
+        newPlayer.y = trackCenterY + trackRadius * Math.sin(newPlayer.angle);
         players[newPlayer.id] = newPlayer;
         console.log("New player joined:", newPlayer);
         draw();
@@ -149,16 +149,16 @@
         if (players[playerData.id]) {
           players[playerData.id].angle = playerData.angle;
           players[playerData.id].x =
-            trackCenterX + trackRadiusX * Math.cos(playerData.angle);
+            trackCenterX + trackRadius * Math.cos(playerData.angle);
           players[playerData.id].y =
-            trackCenterY + trackRadiusY * Math.sin(playerData.angle);
+            trackCenterY + trackRadius * Math.sin(playerData.angle);
           players[playerData.id].color = playerData.color;
           players[playerData.id].name = playerData.name;
         } else {
           playerData.x =
-            trackCenterX + trackRadiusX * Math.cos(playerData.angle);
+            trackCenterX + trackRadius * Math.cos(playerData.angle);
           playerData.y =
-            trackCenterY + trackRadiusY * Math.sin(playerData.angle);
+            trackCenterY + trackRadius * Math.sin(playerData.angle);
           players[playerData.id] = playerData;
         }
         draw();
@@ -179,19 +179,13 @@
         // Create glowing effect for neon
         context.shadowBlur = 15;
         context.shadowColor = "#9370DB";
-        
+
         context.strokeStyle = trackColor;
         context.lineWidth = trackWidth;
         context.beginPath();
-        context.arc(
-          trackCenterX,
-          trackCenterY,
-          trackRadius,
-          0,
-          2 * Math.PI
-        );
+        context.arc(trackCenterX, trackCenterY, trackRadius, 0, 2 * Math.PI);
         context.stroke();
-        
+
         // Reset shadow for other elements
         context.shadowBlur = 0;
 
