@@ -10,6 +10,7 @@ app.use(express.static("public"));
 
 const PORT = 3001;
 let players = {};
+let playerCount = 0; // Track the number of players for assigning player numbers
 
 // Track parameters (server needs to know the starting line concept for initial position)
 const trackCenterX = 400; // Assuming client canvas width 800
@@ -32,17 +33,21 @@ io.on("connection", (socket) => {
   const initialX = trackCenterX + trackRadius * Math.cos(initialAngle);
   const initialY = trackCenterY + trackRadius * Math.sin(initialAngle);
 
+  playerCount += 1;
+  const playerNumber = playerCount;
+  const playerColor = getRandomColor();
+
   players[socket.id] = {
     x: initialX,
     y: initialY,
     angle: initialAngle,
-    color: getRandomColor(),
+    color: playerColor,
     id: socket.id,
-    name: `Racer_${socket.id.substring(0, 4)}`,
+    number: playerNumber, // Use number instead of name
   };
 
   socket.emit("currentPlayers", players);
-  socket.emit("yourId", socket.id, players[socket.id].name);
+  socket.emit("yourId", socket.id, playerNumber, playerColor);
   socket.broadcast.emit("newPlayer", players[socket.id]);
 
   socket.on("playerMovement", (movementData) => {
@@ -57,7 +62,7 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     console.log("User disconnected:", socket.id);
     if (players[socket.id]) {
-      console.log(`${players[socket.id].name} disconnected.`);
+      console.log(`Player ${players[socket.id].number} disconnected.`);
     }
     delete players[socket.id];
     io.emit("playerDisconnected", socket.id);

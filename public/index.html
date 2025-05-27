@@ -106,18 +106,19 @@
       }
 
       // --- Socket Event Handlers ---
-      socket.on("yourId", (id, name) => {
+      socket.on("yourId", (id, number, color) => {
         myId = id;
-        myName = name;
-        playerIdDisplay.textContent = `Your Name: ${myName}`;
+        // Display player number and color by changing the text color
+        playerIdDisplay.innerHTML = `You are <span style="color: ${color}">Player #${number}</span>`;
         if (players[myId]) {
-          players[myId].name = name;
+          players[myId].number = number;
+          players[myId].color = color;
           players[myId].x =
-            trackCenterX + trackRadiusX * Math.cos(players[myId].angle);
+            trackCenterX + trackRadius * Math.cos(players[myId].angle);
           players[myId].y =
-            trackCenterY + trackRadiusY * Math.sin(players[myId].angle);
+            trackCenterY + trackRadius * Math.sin(players[myId].angle);
         }
-        console.log("My ID:", myId, "My Name:", myName);
+        console.log("My ID:", myId, "My Number:", number, "My Color:", color);
       });
 
       socket.on("currentPlayers", (serverPlayers) => {
@@ -130,9 +131,9 @@
         }
         console.log("Current players:", players);
         if (myId && players[myId]) {
-          myName = players[myId].name;
+          // Use the number property from the server
           document.getElementById("playerNumber").textContent =
-            Object.keys(players).indexOf(myId) + 1;
+            players[myId].number;
         }
         draw();
       });
@@ -153,7 +154,7 @@
           players[playerData.id].y =
             trackCenterY + trackRadius * Math.sin(playerData.angle);
           players[playerData.id].color = playerData.color;
-          players[playerData.id].name = playerData.name;
+          players[playerData.id].number = playerData.number;
         } else {
           playerData.x =
             trackCenterX + trackRadius * Math.cos(playerData.angle);
@@ -204,16 +205,9 @@
       }
 
       function drawPlayers() {
-        // Assign numbers to players based on their position in the players object
-        let playerNumber = 1;
-        const playerNumbers = {};
-        for (const id in players) {
-          playerNumbers[id] = playerNumber++;
-        }
-
         for (const id in players) {
           const player = players[id];
-          const number = playerNumbers[id];
+          const number = player.number;
 
           // Draw player cube
           context.fillStyle = player.color;
@@ -229,7 +223,11 @@
           context.font = `bold ${playerSize * 0.6}px Arial`;
           context.textAlign = "center";
           context.textBaseline = "middle";
-          context.fillText(number.toString(), player.x, player.y);
+          context.fillText(
+            number ? number.toString() : "?",
+            player.x,
+            player.y
+          );
 
           // Highlight current player with a white border
           if (id === myId) {
